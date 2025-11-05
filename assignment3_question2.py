@@ -1,114 +1,142 @@
-## Essential Imports
-import numpy as np # for pi and atan
-import matplotlib.pyplot as plt # for plotting contour
+import numpy as np
+import matplotlib.pyplot as plt
 
+#Professor Nadarajah’s Breguet-Range model
 def density(h):
-    ## Calculates the density at a height h
-    # Inputs
-    #   h (m), altitude: float
-    # Output:
-    #   density (kg/m^3): float
-    return 1.2*(1-h*0.0065/288)**5.26
+    return 1.2 * (1 - h * 0.0065 / 288) ** 5.26
 
-def mass_fuel_rate(v,h):
-    ## Calculates the mass fuel rate using the mass flow rate of air hitting the turbine
-    # Inputs:
-    #   v (m/s), velocity: float
-    #   h (m), altitude: float
-    # Output:
-    #   mass_fuel_rate (kg/s): float
-    turbine_area = np.pi*0.92**2/2
+def mass_fuel_rate(v, h):
+    turbine_area = np.pi * 0.92**2 / 2
     FAR = 1E-1
-    return density(h)*v*turbine_area*FAR
+    return density(h) * v * turbine_area * FAR
 
-def C_L(v,h,weight,S):
-    ## Calculates the coefficient of lift
-    # Inputs:
-    #   v (m/s), velocity: float
-    #   h (m), altitude: float
-    #   weight (kg), weight of the aircraft at current time: float
-    #   S (m^2), platform area: float
-    # Output:
-    #   coefficient of lift: float
-    return 9.81*weight/(0.5*density(h)*v**2*S)
+def C_L(v, h, weight, S):
+    return 9.81 * weight / (0.5 * density(h) * v**2 * S)
 
-def C_Dw(v,h):
-    ## Calculates the wave drag of the aircraft
-    # Inputs:
-    #   v (m/s), velocity: float
-    #   h (m), altitude: float
-    # Output:
-    #   wave drag coefficient: float
-    return 10*(np.atan(10*((v/(343*0.7))**2-1))+np.pi/2)
+def C_Dw(v, h):
+    return 10 * (np.atan(10 * ((v / (343 * 0.7))**2 - 1)) + np.pi / 2)
 
-def C_D(v,h,weight,S):
-    ## Calculates the coefficient of drag
-    # Inputs:
-    #   v (m/s), velocity: float
-    #   h (m), altitude: float
-    #   weight (kg), weight of the aircraft at current time: float
-    #   S (m^2), platform area: float
-    # Output:
-    #   coefficient of drag: float
-    e = 0.8
-    AR = 10
-    coeff_drag = 0.5/60
-    coeff_drag += C_L(v,h,weight,S)**2/(np.pi*e*AR)
-    return coeff_drag + C_Dw(v,h)
+def C_D(v, h, weight, S):
+    e, AR = 0.8, 10
+    coeff_drag = 0.5 / 60
+    coeff_drag += C_L(v, h, weight, S)**2 / (np.pi * e * AR)
+    return coeff_drag + C_Dw(v, h)
 
-def ct(v,h,weight,S):
-    ## Calculates the specific fuel consumption
-    # Inputs:
-    #   v (m/s), velocity: float
-    #   h (m), altitude: float
-    #   weight (kg), weight of the aircraft at current time: float
-    #   S (m^2), platform area: float
-    # Output:
-    #   specific fuel consumption: float
-    ct_value = mass_fuel_rate(v,h)/(0.5*density(h)*v**2*S*C_D(v,h,weight,S))
-    return ct_value + 10**(-5)
+def ct(v, h, weight, S):
+    ct_value = mass_fuel_rate(v, h) / (0.5 * density(h) * v**2 * S * C_D(v, h, weight, S))
+    return ct_value + 1e-5
 
-def range(v,h,weight,S):
-    ##Calculates the range of the aircraft
-    # Inputs:
-    #   v (m/s), velocity: float
-    #   h (m), altitude: float
-    #   weight (kg), weight of the aircraft at current time: float
-    #   S (m^2), platform area: float
-    # Output:
-    #   range (km): float
-    W_f = 162400
-    W_fuel = 0.8 * 183214
-    # You can change this to whatever you want, it will only change the total range, not the optimal location
-    W_i = W_f + W_fuel
-    total_range = v/ct(v,h,weight,S)*C_L(v,h,weight,S)/C_D(v,h,weight,S)*np.log(W_i/W_f)
-    return total_range / 1E3
+def aircraft_range(v, h, weight, S):
+    W_empty = 162_400.0
+    W_fuel_total = 146_571.0
+    W_i = W_empty + W_fuel_total
+    W_f = W_empty
+    return (v / ct(v, h, weight, S)
+            * C_L(v, h, weight, S) / C_D(v, h, weight, S)
+            * np.log(W_i / W_f)) / 1e3
 
-""" Example usage for Question 2.1 in Assignment 2 
-## Constants
+#constants
 S = 100
-W_f = 162400
-W_fuel = 0.8 * 183214
-
-## Change this section
+W_empty = 162_400.0
+W_fuel_total = 146_571.0
 fuel_percentage = 0.75
-weight_used = W_f + W_fuel*fuel_percentage
+weight_used = W_empty + fuel_percentage * W_fuel_total
 
-## Example for Assignment 2 Question 2.1
-v_axis = np.linspace(0.1,300,1000) # divide by zero error at 0.0, setting to 0.1
-h_axis = np.linspace(0.1,25000,1000)
+v_min, v_max = 10.0, 540 / 3.6
+h_min, h_max = 0.0, 2.0e4
 
-V,H = np.meshgrid(v_axis,h_axis)
+#gradient
+def grad_numeric(func, x, eps=1e-5):
+    g = np.zeros_like(x)
+    for i in range(len(x)):
+        e = np.zeros_like(x)
+        e[i] = 1.0
+        g[i] = (func(x + eps*e) - func(x - eps*e)) / (2*eps)
+    return g
 
-range_mesh = range(V,H,weight_used,S)
+def f_vec(x):
+    return aircraft_range(x[0], x[1], weight_used, S)
 
-fig, ax = plt.subplots()#subplot_kw={'projection': '2d'})
-contour_obj = ax.contourf(V,H,range_mesh,cmap=plt.get_cmap('jet'),levels = 20)
-fig.colorbar(contour_obj,ax=ax,label="Range (km)")
-ax.set_xlabel("v (m/s)")
-ax.set_ylabel("h (m)")
+#gradient ascent
+def projected_gradient_ascent(x0, max_iter=150, tol=1e-6):
+    x = x0.astype(float).copy()
+    history, fvals = [x.copy()], [f_vec(x)]
+    iters = 0
+    for k in range(max_iter):
+        g = grad_numeric(f_vec, x)
+        if np.linalg.norm(g) < tol:
+            break
+        p = g  # scaled step direction
+        alpha = 0.05  # initial step size
+
+        # Backtracking line search
+        while True:
+            x_new = x + alpha * p
+            x_new[0] = np.clip(x_new[0], v_min, v_max)
+            x_new[1] = np.clip(x_new[1], h_min, h_max)
+            if f_vec(x_new) >= f_vec(x) + 1e-5 * alpha * np.dot(g, p):
+                break
+            alpha *= 0.5
+            if alpha < 1e-8:
+                break
+
+        x = x_new
+        history.append(x.copy())
+        fvals.append(f_vec(x))
+        iters = k + 1
+
+    return np.array(history), np.array(fvals), iters
+
+# start point
+#x0 = np.array([130.0, 11000.0])  # you can adjust this
+#start point using a grid search for initial guess
+v_axis = np.linspace(v_min, v_max, 200)
+h_axis = np.linspace(h_min, h_max, 200)
+V, H = np.meshgrid(v_axis, h_axis)
+R = aircraft_range(V, H, weight_used, S)
+
+i, j = np.unravel_index(np.argmax(R), R.shape)
+x0 = np.array([V[i, j], H[i, j]])
+
+#run
+trajectory, fvals, iterations = projected_gradient_ascent(x0)
+x_star = trajectory[-1]
+R_star = fvals[-1]
+
+#print
+print("\n===============================")
+print("MAXIMUM BREQUET RANGE RESULTS")
+print("===============================")
+print(f"Optimal velocity v*  = {x_star[0]:.4f} m/s  ({x_star[0]*3.6:.2f} km/h)")
+print(f"Optimal altitude h*  = {x_star[1]:.4f} m")
+print(f"Maximum range R*     = {R_star:.4f} km")
+print(f"Converged in {iterations} iterations")
+
+#design space plot
+v_axis_ext = np.linspace(v_min, 250, 300)
+h_axis_ext = np.linspace(h_min, h_max, 200)
+V_ext, H_ext = np.meshgrid(v_axis_ext, h_axis_ext)
+R_ext = aircraft_range(V_ext, H_ext, weight_used, S)
+
+plt.figure(figsize=(7,6))
+contour = plt.contourf(V_ext, H_ext, R_ext, levels=40, cmap="viridis")
+plt.colorbar(contour, label="Range (km)")
+plt.scatter(x0[0], x0[1], c='red', s=60, label='Start')
+plt.scatter(x_star[0], x_star[1], c='lime', s=60, label='Optimum')
+plt.xlabel("Velocity (m/s)")
+plt.ylabel("Altitude (m)")
+plt.title("Maximum Breguet Range with Manufacturer Constraints")
+plt.legend()
+plt.xlim(0, 250)
+plt.tight_layout()
 plt.show()
-# Test to ensure that the max is near the correct location (not exact!)
-i,j = np.where(np.max(range_mesh)==range_mesh)
-print(f"Velocity: {V[i,j]} m/s, Height: {H[i,j]} m, Range: {range_mesh[i,j]} km")
-"""
+
+#convergence plot
+plt.figure(figsize=(7,5))
+plt.plot(fvals, '-o')
+plt.xlabel("Iteration")
+plt.ylabel("Range (km)")
+plt.title("Convergence of Objective Function (Range)")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
