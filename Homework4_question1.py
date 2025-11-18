@@ -1,7 +1,7 @@
 import numpy
 from scipy.optimize import minimize
 import jax
-import jax.numpy   # imported so JAX can handle array math internally
+import jax.numpy
 from matplotlib import pyplot as plt
 
 
@@ -19,7 +19,6 @@ def objective_grad(x):
 
 
 # Constraint: inside the unit disk
-# c(x, y) = 1 - x^2 - y^2 >= 0  (SLSQP uses "ineq" for c(x) >= 0)
 def constraint(x):
     return 1.0 - x[0]**2 - x[1]**2
 
@@ -54,7 +53,7 @@ def constraint_grad_jax(x):
     return numpy.array(constraint_grad_jax_raw(x))
 
 
-# Initial guess
+# Initial point
 x0 = numpy.array([-1, 1])
 bounds = [(-1.5, 2.5), (-1.0, 3.0)]
 
@@ -151,7 +150,7 @@ contours = plt.contour(X, Y, Z,
                        colors='black',
                        linewidths=0.8)
 
-# Paths of the three optimization runs (prepend x0 so path starts at initial guess)
+# Paths of the three optimization runs
 path_no  = numpy.vstack((x0, numpy.array(history_no['x'])))
 path_an  = numpy.vstack((x0, numpy.array(history_an['x'])))
 path_jax = numpy.vstack((x0, numpy.array(history_jax['x'])))
@@ -172,7 +171,7 @@ plt.plot(1.0, 1.0, 'y*', markersize=10, label='Unconstrained minimum (1,1)')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.title('Contour Plot with SLSQP Optimization Paths')
-plt.xlim(-1.8, 1.8)   # stretched but still focused on region of interest
+plt.xlim(-1.8, 1.8)  
 plt.ylim(-1.2, 2.4)
 plt.legend(loc='lower left')
 plt.grid(True)
