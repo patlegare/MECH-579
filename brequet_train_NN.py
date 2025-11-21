@@ -69,8 +69,8 @@ def breguet_range(v, h):
 
 #dataset generation
 
-V_MIN, V_MAX = 10.0, 300.0        # m/s (avoid V=0 to keep formula well-defined)
-H_MIN, H_MAX = 0.0, 25_000.0      # m
+V_MIN, V_MAX = 10.0, 300.0    
+H_MIN, H_MAX = 0.0, 25_000.0      
 
 
 def generate_dataset(n_samples, seed=0):
