@@ -185,7 +185,7 @@ def main():
     z_opt = result.x
     x_opt, y_opt = unpack(z_opt)
 
-    # (a) Show the drone's path around the cost equation
+    # a) Show the drone's path around the cost equation
     grid_x = np.linspace(0.0, 10.0, 200)
     grid_y = np.linspace(0.0, 10.0, 200)
     X, Y = np.meshgrid(grid_x, grid_y)
@@ -205,9 +205,9 @@ def main():
     plt.tight_layout()
     plt.show()
 
-    # (b) plot the convergence of the gradient
-    # Note: SLSQP does not provide easy access to Lagrangian multipliers, 
-    # so we plot the Objective Gradient norm as a proxy.
+    # b) plot the convergence of the gradient
+    # SLSQP does not provide easy access to Lagrangian multipliers
+    # plot the Objective Gradient norm as a proxy
     plt.figure(figsize=(6, 4))
     plt.semilogy(iter_history, grad_norm_history, "b-", linewidth=2)
     plt.xlabel("Iteration")
@@ -217,7 +217,7 @@ def main():
     plt.tight_layout()
     plt.show()
 
-    # (c) plot the value of the constraints as a function of iterations
+    # c) plot the value of the constraints as a function of iterations
     eps = 1e-16
     eq_plot = np.maximum(eq_violation_history, eps)
     ineq_plot = np.maximum(ineq_violation_history, eps)
