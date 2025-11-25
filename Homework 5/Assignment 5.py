@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
-
 # Problem parameters
 T = 15.0
 N = 45
@@ -11,19 +10,19 @@ dt = T / (N - 1)
 
 
 def unpack(z):
-    #split into x and y arrays
+    # split into x and y arrays
     x = z[:N]
     y = z[N:]
     return x, y
 
 
 def cost_field(x, y):
-    #cost function
+    # cost function
     return 1.0 / ((x - 5.0) ** 2 + (y - 5.0) ** 2 + 1.0)
 
 
 def objective(z):
-    #objective function
+    # objective function
     x, y = unpack(z)
     term1 = np.sum(cost_field(x, y))
     dx = np.diff(x)
@@ -33,7 +32,7 @@ def objective(z):
 
 
 def objective_grad(z):
-    #analytical gradiet of the objective function
+    # analytical gradient of the objective function
     x, y = unpack(z)
 
     denom = (x - 5.0) ** 2 + (y - 5.0) ** 2 + 1.0
@@ -62,7 +61,7 @@ constraints = []
 
 
 def add_eq_constraint(name, indices, coeffs, rhs):
-    #coefficients and indices equals RHS
+    # coefficients and indices equals RHS
     indices = np.asarray(indices, dtype=int)
     coeffs = np.asarray(coeffs, dtype=float)
 
@@ -89,10 +88,7 @@ add_eq_constraint("vy_initial", [N + 1, N], [1.0, -1.0], 0.0)
 
 
 def make_speed_constraint(k):
-    """
-    Speed constraint for segment k:
-    vmax^2 - (u_k^2 + v_k^2) >= 0
-    """
+    # Speed constraint for segment k: vmax^2 - (u_k^2 + v_k^2) >= 0
     def fun(z):
         x, y = unpack(z)
         u = (x[k + 1] - x[k]) / dt
@@ -130,9 +126,12 @@ for k in range(N - 1):
 bounds = [(0.0, 10.0)] * (2 * N)
 
 
-# Initial guess: just a traight line from (0,0) to (10,10)
+# Initial guess: slightly perturbed line from (0,0) to (10,10)
 x_init = np.linspace(0.0, 10.0, N)
-y_init = np.linspace(0.0, 10.0, N)
+t = np.linspace(0.0, np.pi, N)
+y_init = np.linspace(0.0, 10.0, N) + 0.5 * np.sin(t)
+# enforce box bounds
+y_init = np.clip(y_init, 0.0, 10.0)
 z0 = np.concatenate([x_init, y_init])
 
 
@@ -144,32 +143,26 @@ ineq_violation_history = []
 
 
 def callback(xk):
-    #stores gradients and constraints values for each iteration
+    # stores gradients and constraint violations for each iteration
     k = len(iter_history)
     iter_history.append(k)
 
     g = objective_grad(xk)
     grad_norm_history.append(np.linalg.norm(g))
 
-    eq_vals = []
-    ineq_vals = []
+    max_eq_violation = 0.0
+    max_ineq_violation = 0.0
 
     for c in constraints:
         val = c["fun"](xk)
         if c["type"] == "eq":
-            eq_vals.append(val)
+            max_eq_violation = max(max_eq_violation, abs(val))
         else:
-            ineq_vals.append(val)
+            # inequality is g(z) >= 0, violation only if negative
+            max_ineq_violation = max(max_ineq_violation, max(0.0, -val))
 
-    if eq_vals:
-        eq_violation_history.append(float(np.max(np.abs(eq_vals))))
-    else:
-        eq_violation_history.append(0.0)
-
-    if ineq_vals:
-        ineq_violation_history.append(float(np.min(ineq_vals)))
-    else:
-        ineq_violation_history.append(0.0)
+    eq_violation_history.append(max_eq_violation)
+    ineq_violation_history.append(max_ineq_violation)
 
 
 def main():
@@ -192,56 +185,80 @@ def main():
     z_opt = result.x
     x_opt, y_opt = unpack(z_opt)
 
-    # a) Path on contour plot of cost field
+    # (a) Show the drone's path around the cost equation
     grid_x = np.linspace(0.0, 10.0, 200)
     grid_y = np.linspace(0.0, 10.0, 200)
     X, Y = np.meshgrid(grid_x, grid_y)
     C = cost_field(X, Y)
 
-    plt.figure(figsize=(6, 5))
-    cs = plt.contourf(X, Y, C, levels=40)
+    plt.figure(figsize=(7, 6))
+    cs = plt.contourf(X, Y, C, levels=40, cmap='viridis')
     plt.colorbar(cs, label="C(x, y)")
-    plt.plot(x_init, y_init, "o--", label="Initial guess")
-    plt.plot(x_opt, y_opt, "o-", label="Optimized path")
+    plt.plot(x_init, y_init, "k--", alpha=0.6, label="Initial guess")
+    plt.scatter(x_opt, y_opt, c='red', s=15, zorder=5, label="Drone locations")
+    plt.plot(x_opt, y_opt, "r-", alpha=0.8, label="Optimized path")
     plt.xlabel("x")
     plt.ylabel("y")
     plt.axis("equal")
-    plt.title("Drone path on cost field")
-    plt.legend()
+    plt.title("(a) Drone path on cost field")
+    plt.legend(loc='upper right')
     plt.tight_layout()
     plt.show()
 
-    # b) Convergence of gradient norm
+    # (b) plot the convergence of the gradient
+    # Note: SLSQP does not provide easy access to Lagrangian multipliers, 
+    # so we plot the Objective Gradient norm as a proxy.
     plt.figure(figsize=(6, 4))
-    plt.semilogy(iter_history, grad_norm_history, "o-")
+    plt.semilogy(iter_history, grad_norm_history, "b-", linewidth=2)
     plt.xlabel("Iteration")
-    plt.ylabel("Norm of gradient of objective")
-    plt.title("Gradient convergence (proxy for Lagrangian gradient)")
-    plt.grid(True)
+    plt.ylabel(r"$||\nabla f(x)||$")
+    plt.title("(b) Gradient Convergence")
+    plt.grid(True, which="both", ls="-", alpha=0.4)
     plt.tight_layout()
     plt.show()
 
-    # c) Constraint values as function of iterations
+    # (c) plot the value of the constraints as a function of iterations
+    eps = 1e-16
+    eq_plot = np.maximum(eq_violation_history, eps)
+    ineq_plot = np.maximum(ineq_violation_history, eps)
+
     plt.figure(figsize=(6, 4))
-    plt.semilogy(iter_history, eq_violation_history, "o-", label="Max abs equality")
-    plt.plot(iter_history, ineq_violation_history, "s-", label="Min inequality")
-    plt.axhline(0.0, color="k", linewidth=1)
+    plt.semilogy(iter_history, eq_plot, "r-", label="Max abs equality violation")
+    plt.semilogy(iter_history, ineq_plot, "g--", label="Max inequality violation")
     plt.xlabel("Iteration")
-    plt.ylabel("Constraint metrics")
-    plt.title("Constraint convergence")
+    plt.ylabel("Constraint Violation")
+    plt.title("(c) Constraint Convergence")
     plt.legend()
-    plt.grid(True)
+    plt.grid(True, which="both", ls="-", alpha=0.4)
     plt.tight_layout()
     plt.show()
 
     # Final constraint table
-    print("\nFinal constraint function values")
-    print("(Equality: h(x) = 0, Inequality: g(x) >= 0)\n")
-    print("{:<20s} {:>15s}".format("Constraint", "value"))
+    print("\n" + "="*45)
+    print("FINAL CONSTRAINT TABLE")
+    print("="*45)
+    print("{:<25s} | {:>15s}".format("Constraint Name", "Value"))
+    print("-" * 45)
+
+    # Print position/velocity constraints individually
     for c in constraints:
-        val = c["fun"](z_opt)
-        name = c.get("name", "unnamed")
-        print("{:<20s} {:>15.6e}".format(name, val))
+        if "speed" not in c.get("name", ""):
+            val = c["fun"](z_opt)
+            name = c.get("name", "unnamed")
+            print("{:<25s} | {:>15.4e}".format(name, val))
+
+    # Summarize speed constraints (there are too many to list individually)
+    speed_vals = []
+    for c in constraints:
+        if "speed" in c.get("name", ""):
+            speed_vals.append(c["fun"](z_opt))
+    
+    # For inequality g(x) >= 0, a positive value is good.
+    min_speed_margin = min(speed_vals)
+    print("-" * 45)
+    print("{:<25s} | {:>15.4e}".format("Min Speed Margin (>=0)", min_speed_margin))
+    print("(Positive margin means all speed limits are satisfied)")
+    print("="*45)
 
 
 if __name__ == "__main__":
