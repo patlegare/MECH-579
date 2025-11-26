@@ -464,7 +464,7 @@ bounds_two = [(0.0, 10.0)] * (4 * N)
 
 x1_init_q3 = np.linspace(0.0, 10.0, N)
 t_q3 = np.linspace(0.0, np.pi, N)
-y1_init_q3 = np.linspace(0.0, 10.0, N) + 0.5 * np.sin(t_q3)
+y1_init_q3 = np.linspace(0.0, 10.0, N) + 0.5 * np.cos(t_q3)
 y1_init_q3 = np.clip(y1_init_q3, 0.0, 10.0)
 
 x2_init_q3 = np.linspace(10.0, 0.0, N)
