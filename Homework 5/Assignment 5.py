@@ -19,6 +19,7 @@ def unpack(z):
 def cost_field(x, y):
     # cost function
     return 1.0 / ((x - 5.0) ** 2 + (y - 5.0) ** 2 + 1.0)
+    #return np.cos(x)**2 * np.cos(y)**2
 
 
 def objective(z):
@@ -35,9 +36,14 @@ def objective_grad(z):
     # analytical gradient of the objective function
     x, y = unpack(z)
 
+    #for question 1
     denom = (x - 5.0) ** 2 + (y - 5.0) ** 2 + 1.0
     dC_dx = -2.0 * (x - 5.0) / (denom ** 2)
     dC_dy = -2.0 * (y - 5.0) / (denom ** 2)
+
+    #for question 2
+    dC_dx = -np.sin(2.0 * x) * (np.cos(y) ** 2)
+    dC_dy = -(np.cos(x) ** 2) * np.sin(2.0 * y)
 
     grad2_x = np.zeros_like(x)
     grad2_y = np.zeros_like(y)
@@ -219,11 +225,11 @@ def main():
 
     # c) plot the value of the constraints as a function of iterations
     eps = 1e-16
-    eq_plot = np.maximum(eq_violation_history, eps)
+   #eq_plot = np.maximum(eq_violation_history, eps)
     ineq_plot = np.maximum(ineq_violation_history, eps)
 
     plt.figure(figsize=(6, 4))
-    plt.semilogy(iter_history, eq_plot, "r-", label="Max abs equality violation")
+    #plt.semilogy(iter_history, eq_plot, "r-", label="Max abs equality violation")
     plt.semilogy(iter_history, ineq_plot, "g--", label="Max inequality violation")
     plt.xlabel("Iteration")
     plt.ylabel("Constraint Violation")
