@@ -208,7 +208,7 @@ def main():
     plt.ylabel("y")
     plt.axis("equal")
     plt.title("(a) Drone path on cost field")
-    plt.legend(loc='upper right')
+    plt.legend(loc='upper left')
     plt.tight_layout()
     plt.show()
 
