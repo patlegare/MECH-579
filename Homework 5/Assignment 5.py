@@ -271,10 +271,17 @@ def main_single_drone():
         """
         if state is None:
             return
+
         k = len(lag_iter_history)
         lag_iter_history.append(k)
-        # this is the grad of lagrangian
-        lag_grad_norm_history.append(state["optimality"])
+
+        # Prefer the full Lagrangian gradient if provided (SciPy version-dependent)
+        if "lagrangian_grad" in state and state["lagrangian_grad"] is not None:
+            grad_L = state["lagrangian_grad"]
+            lag_grad_norm_history.append(np.linalg.norm(grad_L))
+        else:
+            # Fallback: use the scalar optimality measure (what you had before)
+            lag_grad_norm_history.append(state["optimality"])
 
     result_trust = minimize(
         objective,
