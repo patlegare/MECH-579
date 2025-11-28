@@ -150,7 +150,7 @@ z0 = np.concatenate([x_init, y_init])
 #Question 1/2: single drone
 
 def main_single_drone():
-    # --- histories for SLSQP (objective gradient & constraints) ---
+    #histories for SLSQP (objective gradient & constraints)
     iter_history = []
     grad_norm_history = []
     eq_violation_history = []
@@ -198,7 +198,7 @@ def main_single_drone():
     z_opt = result_slsqp.x
     x_opt, y_opt = unpack(z_opt)
 
-    # (a) Show the drone's path around the cost equation (using SLSQP solution)
+    #a) Show the drone's path around the cost equation (using SLSQP solution)
     grid_x = np.linspace(0.0, 10.0, 200)
     grid_y = np.linspace(0.0, 10.0, 200)
     X, Y = np.meshgrid(grid_x, grid_y)
@@ -218,7 +218,7 @@ def main_single_drone():
     plt.tight_layout()
     plt.show()
 
-    # (c) Constraint convergence (still from SLSQP)
+    #c) Constraint convergence (still from SLSQP)
     eps = 1e-16
     ineq_plot = np.maximum(ineq_violation_history, eps)
 
@@ -275,12 +275,12 @@ def main_single_drone():
         k = len(lag_iter_history)
         lag_iter_history.append(k)
 
-        # Prefer the full Lagrangian gradient if provided (SciPy version-dependent)
+        # Prefer the full Lagrangian gradient if provided
         if "lagrangian_grad" in state and state["lagrangian_grad"] is not None:
             grad_L = state["lagrangian_grad"]
             lag_grad_norm_history.append(np.linalg.norm(grad_L))
         else:
-            # Fallback: use the scalar optimality measure (what you had before)
+            # scalar optimality measure
             lag_grad_norm_history.append(state["optimality"])
 
     result_trust = minimize(
@@ -303,7 +303,7 @@ def main_single_drone():
     print("Message:", result_trust.message)
     print("Final objective value:", result_trust.fun)
 
-    # (b) plot the convergence of the gradient of the Lagrangian (trust-constr)
+    # b) plot the convergence of the gradient of the Lagrangian (trust-constr)
     plt.figure(figsize=(6, 4))
     plt.semilogy(lag_iter_history, lag_grad_norm_history, "b-", linewidth=2)
     plt.xlabel("Iteration")
