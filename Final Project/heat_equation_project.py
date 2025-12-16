@@ -340,6 +340,16 @@ if __name__ == "__main__":
     rho_si = 2323
     c_si = 19.789 / 28.085 * 1000  # J/(kgK)
 
+    #Create global storage
+    history = {
+        "obj": [],          # objective value
+        "Tmax": [],         # max temperature
+        "eta": [],          # fan efficiency
+        "constraint": [],   # power constraint residual (should → 0)
+        "x": [],            # design variables [v, a, b, c]
+        "grad_L": []        # norm of gradient of Lagrangian
+    }
+
 
     def initial_condition(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         r, c = x.shape
@@ -388,7 +398,27 @@ if __name__ == "__main__":
         x[3] (float): c coefficient of heat generation
 
         """
+        # Extract values
+        v,a,b,c = x 
+        heq.reset()
 
+        # Set variables
+        heq.set_fan_velocity(v)
+        heq.set_heat_generation(heat_generation_function, a, b, c)
+
+        # Solve PDE
+        heq.solve_until_steady_state(tol=global_tolerance)
+
+        # Store the results
+        Tmax = np.max(heq.u)
+        eta = heq.fan_efficiency
+        obj = w1 * (Tmax / 293.0) - w2 * eta
+
+        history["obj"].append(obj)
+        history["Tmax"].append(Tmax)
+        history["eta"].append(eta)
+        history["constraint"].append(heq.heat_generation_total - 10.0)
+        history["x"].append(x.copy())
         return w1 * np.max(heq.u) / 273 - w2 * heq.fan_efficiency
 
     ## Bounds for inputs
@@ -410,6 +440,12 @@ if __name__ == "__main__":
         x[2] (float): b coefficient of heat generation
         x[3] (float): c coefficient of heat generation
         """
+
+        _,a,b,c = x # Extract Variables
+
+        #Calculate heat generation
+        heq.set_heat_generation(heat_generation_function, a, b, c)
+ 
         return 10 - heq.heat_generation_total
 
     ## Setting the constraints
