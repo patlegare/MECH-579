@@ -412,14 +412,14 @@ if __name__ == "__main__":
         # Store the results
         Tmax = np.max(heq.u)
         eta = heq.fan_efficiency
-        obj = w1 * (Tmax / 293.0) - w2 * eta
+        obj = w1 * (Tmax / 273.0) - w2 * eta
 
         history["obj"].append(obj)
         history["Tmax"].append(Tmax)
         history["eta"].append(eta)
         history["constraint"].append(heq.heat_generation_total - 10.0)
         history["x"].append(x.copy())
-        return w1 * np.max(heq.u) / 273 - w2 * heq.fan_efficiency
+        return obj
 
     ## Bounds for inputs
     bounds = [
@@ -446,7 +446,7 @@ if __name__ == "__main__":
         #Calculate heat generation
         heq.set_heat_generation(heat_generation_function, a, b, c)
  
-        return 10 - heq.heat_generation_total
+        return heq.heat_generation_total - 10
 
     ## Setting the constraints
     constraints = [
