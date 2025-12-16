@@ -1,8 +1,9 @@
 # Imports
-import numpy as np # numpy for vectorization
-from collections.abc import Callable # For type hints
+import numpy as np  # numpy for vectorization
+from collections.abc import Callable  # For type hints
 import matplotlib.pyplot as plt
 from scipy import optimize
+
 class HeatEquation2D:
     """Heat Equation Solver for MECH 579 Final Project
 
@@ -63,13 +64,13 @@ class HeatEquation2D:
         self.rho = rho
         self.cp = cp
         self.thermal_alpha = self.k / (self.rho * self.cp)
-        self.height = height #m
+        self.height = height  # m
 
         ## Temporal Properties
         self.CFL = CFL
         self.dt = self.CFL * (self.dx * self.dy) / self.thermal_alpha
         self.current_time = 0
-        self.steady_state_error = 1E2 # Large inital number to ensure that the problem will continue
+        self.steady_state_error = 1E2  # Large inital number to ensure that the problem will continue
         self.max_iter = 5E4
         self.init_condition = init_condition
         self.apply_initial_conditions()
@@ -81,13 +82,13 @@ class HeatEquation2D:
         self.ext_T = 273 + 20  # K Temperature
 
         ## Fan Variables
-        self.v = 10 # m/s Air Velocity
-        self.fan_efficiency_func = lambda v: -0.002*v**2 + 0.08*v
+        self.v = 10  # m/s Air Velocity
+        self.fan_efficiency_func = lambda v: -0.002 * v**2 + 0.08 * v
         self.fan_efficiency = self.fan_efficiency_func(self.v)
 
         self.verbose = False
 
-    def set_initial_conditions(self,initial_conditions:Callable[[np.ndarray,np.ndarray],np.ndarray]):
+    def set_initial_conditions(self, initial_conditions:Callable[[np.ndarray,np.ndarray],np.ndarray]):
         """Sets the initial condition
 
         Parameters
@@ -100,7 +101,7 @@ class HeatEquation2D:
 
     def apply_initial_conditions(self):
         """Applies the initial condition into self.u"""
-        self.u = self.init_condition(self.X,self.Y)
+        self.u = self.init_condition(self.X, self.Y)
 
     def reset(self):
         """Resets the heat equation"""
@@ -126,18 +127,18 @@ class HeatEquation2D:
         self.heat_gen_a = a
         self.heat_gen_b = b
         self.heat_gen_c = c
-        heat_generation_matrix = self.heat_generation_function(self.X,self.Y,self.heat_gen_a,self.heat_gen_b,self.heat_gen_c) * self.dx * self.dy *self.height
-        i0, iN, j0 ,jN = 0, self.n_x - 1, 0 , self.n_y - 1
+        heat_generation_matrix = self.heat_generation_function(self.X, self.Y, self.heat_gen_a, self.heat_gen_b, self.heat_gen_c) * self.dx * self.dy * self.height
+        i0, iN, j0, jN = 0, self.n_x - 1, 0, self.n_y - 1
         # Boundaries with one side
-        heat_generation_matrix[i0,:] /= 2
-        heat_generation_matrix[iN,:] /= 2
-        heat_generation_matrix[j0,:] /= 2
-        heat_generation_matrix[jN,:] /= 2
+        heat_generation_matrix[i0, :] /= 2
+        heat_generation_matrix[iN, :] /= 2
+        heat_generation_matrix[j0, :] /= 2
+        heat_generation_matrix[jN, :] /= 2
         # Boundaries with two sides
-        heat_generation_matrix[i0,j0] /= 2
-        heat_generation_matrix[iN,jN] /= 2
-        heat_generation_matrix[iN,j0] /= 2
-        heat_generation_matrix[i0,jN] /= 2
+        heat_generation_matrix[i0, j0] /= 2
+        heat_generation_matrix[iN, jN] /= 2
+        heat_generation_matrix[iN, j0] /= 2
+        heat_generation_matrix[i0, jN] /= 2
         self.heat_generation_total = np.sum(np.sum(heat_generation_matrix))
 
     def set_fan_velocity(self, v: float):
@@ -152,8 +153,7 @@ class HeatEquation2D:
         self.v = v
         self.fan_efficiency = self.fan_efficiency_func(self.v)
 
-
-    def h_boundary(self,u: np.ndarray):
+    def h_boundary(self, u: np.ndarray):
         """Calculates the convective heat transfer coefficient at the boundaries
 
         Parameters
@@ -162,13 +162,13 @@ class HeatEquation2D:
 
         u (np.ndarray): Current Temperature Mesh
         """
-        beta = 1/((u+self.ext_T)/2)
-        rayleigh = 9.81*beta*(u-self.ext_T)*self.dx**3/(self.ext_nu**2)*self.ext_Pr
-        nusselt = (0.825 + (0.387*rayleigh**(1/6))/
-                   (1+(0.492/self.ext_Pr)**(9/16))**(8/27))**2
-        return nusselt*self.ext_k/self.dx
+        beta = 1 / ((u + self.ext_T) / 2)
+        rayleigh = 9.81 * beta * (u - self.ext_T) * self.dx**3 / (self.ext_nu**2) * self.ext_Pr
+        nusselt = (0.825 + (0.387 * rayleigh**(1/6)) /
+                   (1 + (0.492 / self.ext_Pr)**(9/16))**(8/27))**2
+        return nusselt * self.ext_k / self.dx
 
-    def h_top(self,x: np.ndarray,u):
+    def h_top(self, x: np.ndarray, u):
         """Calculates the convective heat transfer coefficient from the fan velocity
 
         Parameters
@@ -179,21 +179,21 @@ class HeatEquation2D:
 
         u (np.ndarray): UNUSED
         """
-        Rex = self.v*x/self.ext_nu
-        r,c = Rex.shape
-        Nux = np.zeros((r,c))
+        Rex = self.v * x / self.ext_nu
+        r, c = Rex.shape
+        Nux = np.zeros((r, c))
         for i in range(r):
             for j in range(c):
-                if Rex[i,j] < 5E5:
-                    Nux[i,j] = 0.332*Rex[i,j]**0.5*self.ext_Pr**(1/3)
+                if Rex[i, j] < 5E5:
+                    Nux[i, j] = 0.332 * Rex[i, j]**0.5 * self.ext_Pr**(1/3)
                 else:
-                    Nux[i,j] = 0.0296*Rex[i,j]**0.8*self.ext_Pr**(1/3)
-        h = Nux*self.ext_k/(x + 1E-5)
+                    Nux[i, j] = 0.0296 * Rex[i, j]**0.8 * self.ext_Pr**(1/3)
+        h = Nux * self.ext_k / (x + 1E-5)
         return h
 
     def calculate_h(self):
         """Calculates all necessary convective heat transfer coefficients"""
-        self.h_top_values = self.h_top(self.X,self.u)
+        self.h_top_values = self.h_top(self.X, self.u)
         self.h_boundary_values = self.h_boundary(self.u)
 
     def apply_boundary_conditions(self, old_u):
@@ -206,76 +206,76 @@ class HeatEquation2D:
         old_u (np.ndarray): Current Temperature Mesh
         """
         e_dot = self.heat_generation_function(self.X, self.Y, self.heat_gen_a, self.heat_gen_b, self.heat_gen_c)
-        tau = self.thermal_alpha * self.dt / (self.dx*self.dy)
-        i0,j0,iN,jN = 0, 0, self.n_x-1, self.n_y-1
+        tau = self.thermal_alpha * self.dt / (self.dx * self.dy)
+        i0, j0, iN, jN = 0, 0, self.n_x - 1, self.n_y - 1
         # Left
-        self.u[i0,1:-1] = (old_u[i0,1:-1] +
-                            2 * tau * self.h_boundary_values[i0,1:-1]/self.k * self.dy * (self.ext_T - old_u[i0,1:-1]) +
-                            tau * self.dx * (old_u[i0,2:] - old_u[i0,1:-1]) / self.dy +
-                            tau * self.dx * (old_u[i0,1:-1] - old_u[i0,2:]) / self.dy +
+        self.u[i0, 1:-1] = (old_u[i0, 1:-1] +
+                            2 * tau * self.h_boundary_values[i0, 1:-1] / self.k * self.dy * (self.ext_T - old_u[i0, 1:-1]) +
+                            tau * self.dx * (old_u[i0, 2:] - old_u[i0, 1:-1]) / self.dy +
+                            tau * self.dx * (old_u[i0, 1:-1] - old_u[i0, 2:]) / self.dy +
                             2 * tau * self.dy * (old_u[i0 + 1, 1:-1] - old_u[i0, 1:-1]) / self.dx +
-                            tau * self.h_top_values[i0,1:-1]/self.k * self.dx * self.dy / self.height  * (self.ext_T - old_u[i0,1:-1]) +
-                            tau * e_dot[i0,1:-1] / self.k * self.dx * self.dy)
+                            tau * self.h_top_values[i0, 1:-1] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[i0, 1:-1]) +
+                            tau * e_dot[i0, 1:-1] / self.k * self.dx * self.dy)
 
         # Right
         self.u[iN, 1:-1] = (old_u[iN, 1:-1] +
                             2 * tau * self.h_boundary_values[iN, 1:-1] / self.k * self.dy * (self.ext_T - old_u[iN, 1:-1]) +
                             tau * self.dx * (old_u[iN, 2:] - old_u[iN, 1:-1]) / self.dy +
                             tau * self.dx * (old_u[iN, 1:-1] - old_u[iN, 2:]) / self.dy +
-                            2 * tau * self.dy * (old_u[iN- 1, 1:-1] - old_u[iN,1:-1]) / self.dx +
+                            2 * tau * self.dy * (old_u[iN - 1, 1:-1] - old_u[iN, 1:-1]) / self.dx +
                             tau * self.h_top_values[iN, 1:-1] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[iN, 1:-1]) +
                             tau * e_dot[iN, 1:-1] / self.k * self.dx * self.dy)
 
         # Bottom
-        self.u[1:-1,j0] = (old_u[1:-1,j0] +
-                            2 * tau * self.h_boundary_values[1:-1,j0] / self.k * self.dx * (self.ext_T - old_u[1:-1,j0]) +
-                            tau * self.dy * (old_u[2:,j0] - old_u[1:-1,j0]) / self.dx +
-                            tau * self.dy * (old_u[1:-1,j0] - old_u[2:,j0]) / self.dx +
-                            2 * tau * self.dx * (old_u[1:-1,j0 + 1] - old_u[1:-1,j0]) / self.dy +
-                            tau * self.h_top_values[1:-1,j0] / self.k * self.dx * self.dy / self.height  * (self.ext_T - old_u[1:-1,j0]) +
-                            tau * e_dot[1:-1,j0] / self.k * self.dx * self.dy)
+        self.u[1:-1, j0] = (old_u[1:-1, j0] +
+                            2 * tau * self.h_boundary_values[1:-1, j0] / self.k * self.dx * (self.ext_T - old_u[1:-1, j0]) +
+                            tau * self.dy * (old_u[2:, j0] - old_u[1:-1, j0]) / self.dx +
+                            tau * self.dy * (old_u[1:-1, j0] - old_u[2:, j0]) / self.dx +
+                            2 * tau * self.dx * (old_u[1:-1, j0 + 1] - old_u[1:-1, j0]) / self.dy +
+                            tau * self.h_top_values[1:-1, j0] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[1:-1, j0]) +
+                            tau * e_dot[1:-1, j0] / self.k * self.dx * self.dy)
 
         # Top
-        self.u[1:-1,jN] = (old_u[1:-1,jN] +
-                            2 * tau * self.h_boundary_values[1:-1,jN] / self.k * self.dx * (self.ext_T - old_u[1:-1,jN]) +
-                            tau * self.dy * (old_u[2:,jN] - old_u[1:-1,jN]) / self.dx +
-                            tau * self.dy * (old_u[1:-1,jN] - old_u[2:,jN]) / self.dx +
-                            2 * tau * self.dx * (old_u[1:-1,jN - 1] - old_u[1:-1,jN]) / self.dy +
-                            tau * self.h_top_values[1:-1,jN] / self.k * self.dx * self.dy / self.height  * (self.ext_T - old_u[1:-1,jN]) +
+        self.u[1:-1, jN] = (old_u[1:-1, jN] +
+                            2 * tau * self.h_boundary_values[1:-1, jN] / self.k * self.dx * (self.ext_T - old_u[1:-1, jN]) +
+                            tau * self.dy * (old_u[2:, jN] - old_u[1:-1, jN]) / self.dx +
+                            tau * self.dy * (old_u[1:-1, jN] - old_u[2:, jN]) / self.dx +
+                            2 * tau * self.dx * (old_u[1:-1, jN - 1] - old_u[1:-1, jN]) / self.dy +
+                            tau * self.h_top_values[1:-1, jN] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[1:-1, jN]) +
                             tau * e_dot[1:-1, jN] / self.k * self.dx * self.dy)
 
         ## Bottom Left Corner
-        self.u[i0,j0] = (old_u[i0,j0] +
-                         2 * tau * self.h_boundary_values[i0,j0] * self.dy / self.k * (self.ext_T - old_u[i0,j0]) +
-                         2 * tau * self.h_boundary_values[i0,j0] * self.dx / self.k * (self.ext_T - old_u[i0,j0]) +
-                         2 * tau * self.dx * (old_u[i0,j0+1] - old_u[i0,j0]) / self.dy +
-                         2 * tau * self.dy * (old_u[i0+1,j0] - old_u[i0,j0]) / self.dx +
-                         tau * self.h_top_values[i0,j0] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[i0,j0]) +
-                         tau * e_dot[i0,j0] / self.k * self.dx * self.dy)
+        self.u[i0, j0] = (old_u[i0, j0] +
+                          2 * tau * self.h_boundary_values[i0, j0] * self.dy / self.k * (self.ext_T - old_u[i0, j0]) +
+                          2 * tau * self.h_boundary_values[i0, j0] * self.dx / self.k * (self.ext_T - old_u[i0, j0]) +
+                          2 * tau * self.dx * (old_u[i0, j0 + 1] - old_u[i0, j0]) / self.dy +
+                          2 * tau * self.dy * (old_u[i0 + 1, j0] - old_u[i0, j0]) / self.dx +
+                          tau * self.h_top_values[i0, j0] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[i0, j0]) +
+                          tau * e_dot[i0, j0] / self.k * self.dx * self.dy)
         ## Bottom Right Corner
-        self.u[iN,j0] = (old_u[iN,j0] +
-                         2 * tau * self.h_boundary_values[iN,j0] * self.dy / self.k * (self.ext_T - old_u[iN,j0]) +
-                         2 * tau * self.h_boundary_values[iN,j0] * self.dx / self.k * (self.ext_T - old_u[iN,j0]) +
-                         2 * tau * self.dx * (old_u[iN,j0+1] - old_u[iN,j0]) / self.dy +
-                         2 * tau * self.dy * (old_u[iN-1,j0] - old_u[iN,j0]) / self.dx +
-                         tau * self.h_top_values[iN,j0] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[iN,j0]) +
-                         tau * e_dot[iN,j0] / self.k * self.dx * self.dy)
+        self.u[iN, j0] = (old_u[iN, j0] +
+                          2 * tau * self.h_boundary_values[iN, j0] * self.dy / self.k * (self.ext_T - old_u[iN, j0]) +
+                          2 * tau * self.h_boundary_values[iN, j0] * self.dx / self.k * (self.ext_T - old_u[iN, j0]) +
+                          2 * tau * self.dx * (old_u[iN, j0 + 1] - old_u[iN, j0]) / self.dy +
+                          2 * tau * self.dy * (old_u[iN - 1, j0] - old_u[iN, j0]) / self.dx +
+                          tau * self.h_top_values[iN, j0] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[iN, j0]) +
+                          tau * e_dot[iN, j0] / self.k * self.dx * self.dy)
         ## Top Left Corner
-        self.u[i0,jN] = (old_u[i0,jN] +
-                         2 * tau * self.h_boundary_values[i0,jN] * self.dy / self.k * (self.ext_T - old_u[i0,jN]) +
-                         2 * tau * self.h_boundary_values[i0,jN] * self.dx / self.k * (self.ext_T - old_u[i0,jN]) +
-                         2 * tau * self.dx * (old_u[i0,jN-1] - old_u[i0,jN]) / self.dy +
-                         2 * tau * self.dy * (old_u[i0+1,jN] - old_u[i0,jN]) / self.dx +
-                         tau * self.h_top_values[i0,jN] / self.k * self.dx * self.dy / self.height  * (self.ext_T - old_u[i0,jN]) +
-                         tau * e_dot[i0,jN] / self.k * self.dx * self.dy)
+        self.u[i0, jN] = (old_u[i0, jN] +
+                          2 * tau * self.h_boundary_values[i0, jN] * self.dy / self.k * (self.ext_T - old_u[i0, jN]) +
+                          2 * tau * self.h_boundary_values[i0, jN] * self.dx / self.k * (self.ext_T - old_u[i0, jN]) +
+                          2 * tau * self.dx * (old_u[i0, jN - 1] - old_u[i0, jN]) / self.dy +
+                          2 * tau * self.dy * (old_u[i0 + 1, jN] - old_u[i0, jN]) / self.dx +
+                          tau * self.h_top_values[i0, jN] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[i0, jN]) +
+                          tau * e_dot[i0, jN] / self.k * self.dx * self.dy)
         ## Top Right Corner
-        self.u[iN,jN] = (old_u[iN,jN] +
-                         2 * tau * self.h_boundary_values[iN,jN] * self.dy / self.k * (self.ext_T - old_u[iN,jN]) +
-                         2 * tau * self.h_boundary_values[iN,jN] * self.dx / self.k * (self.ext_T - old_u[iN,jN]) +
-                         2 * tau * self.dx * (old_u[iN,jN-1] - old_u[iN,jN]) / self.dy +
-                         2 * tau * self.dy * (old_u[iN-1,jN] - old_u[iN,jN]) / self.dx +
-                         tau * self.h_top_values[iN,jN] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[iN,jN]) +
-                         tau * e_dot[iN,jN] / self.k * self.dx * self.dy)
+        self.u[iN, jN] = (old_u[iN, jN] +
+                          2 * tau * self.h_boundary_values[iN, jN] * self.dy / self.k * (self.ext_T - old_u[iN, jN]) +
+                          2 * tau * self.h_boundary_values[iN, jN] * self.dx / self.k * (self.ext_T - old_u[iN, jN]) +
+                          2 * tau * self.dx * (old_u[iN, jN - 1] - old_u[iN, jN]) / self.dy +
+                          2 * tau * self.dy * (old_u[iN - 1, jN] - old_u[iN, jN]) / self.dx +
+                          tau * self.h_top_values[iN, jN] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[iN, jN]) +
+                          tau * e_dot[iN, jN] / self.k * self.dx * self.dy)
         return
 
     def step_forward_in_time(self):
@@ -285,12 +285,17 @@ class HeatEquation2D:
         self.apply_boundary_conditions(old_u)
         tau = self.thermal_alpha * self.dt / (self.dx * self.dy)
         self.u[1:-1, 1:-1] = (old_u[1:-1, 1:-1] +
-                                    tau * (
-                                            self.dy * (old_u[2:, 1:-1] - 2 * old_u[1:-1, 1:-1] + old_u[0:-2, 1:-1]) / self.dx  +
-                                            self.dx * (old_u[1:-1, 2:] - 2 * old_u[1:-1, 1:-1] + old_u[1:-1, 0:-2]) / self.dy
-                                    ) + tau * (self.h_top_values[1:-1, 1:-1] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[1:-1, 1:-1]) +
-                                    self.dx * self.dy / self.k * self.heat_generation_function(self.X[1:-1, 1:-1],self.Y[1:-1, 1:-1],self.heat_gen_a,self.heat_gen_b,self.heat_gen_c)))
-        self.steady_state_error = np.linalg.norm(self.u - old_u,np.inf)
+                              tau * (
+                                  self.dy * (old_u[2:, 1:-1] - 2 * old_u[1:-1, 1:-1] + old_u[0:-2, 1:-1]) / self.dx +
+                                  self.dx * (old_u[1:-1, 2:] - 2 * old_u[1:-1, 1:-1] + old_u[1:-1, 0:-2]) / self.dy
+                              ) + tau * (
+                                  self.h_top_values[1:-1, 1:-1] / self.k * self.dx * self.dy / self.height * (self.ext_T - old_u[1:-1, 1:-1]) +
+                                  self.dx * self.dy / self.k * self.heat_generation_function(
+                                      self.X[1:-1, 1:-1], self.Y[1:-1, 1:-1],
+                                      self.heat_gen_a, self.heat_gen_b, self.heat_gen_c
+                                  )
+                              ))
+        self.steady_state_error = np.linalg.norm(self.u - old_u, np.inf)
         self.current_time += self.dt
 
     def solve_until_steady_state(self, tol: float = 1e-3):
@@ -310,13 +315,12 @@ class HeatEquation2D:
             if (iter % 1000) == 0 and self.verbose:
                 print(f"Iteration: {iter}, Error: {self.steady_state_error}")
 
-
-    def solve_until_time(self,final_time: float):
+    def solve_until_time(self, final_time: float):
         """Solves until time is reached
 
         Parameters
 
-        final_time (float): Final time of simulation
+        final_time (float): Final time of sim ul a ti o n
         """
         iter = 0
         while self.current_time < final_time:
@@ -350,7 +354,6 @@ if __name__ == "__main__":
         "grad_L": []        # norm of gradient of Lagrangian
     }
 
-
     def initial_condition(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         r, c = x.shape
         u = np.zeros([r, c])
@@ -358,32 +361,35 @@ if __name__ == "__main__":
         u = 70 * np.sin(x * np.pi / cpu_x) * np.sin(y * np.pi / cpu_y) + 293
         return u
 
-
     def heat_generation_function(x: np.ndarray, y: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
         return a * x + b * y + c
+
     ## Problem Set up
-    heq = HeatEquation2D(cpu_x,cpu_y,cpu_z, N,N,
-                       k=k_si,rho=rho_si,cp=c_si,
-                       init_condition=initial_condition)
+    heq = HeatEquation2D(cpu_x, cpu_y, cpu_z, N, N,
+                        k=k_si, rho=rho_si, cp=c_si,
+                        init_condition=initial_condition)
     # Test values for a,b,c
-    test_a = 1*10**6
-    test_b = 1*10**6
-    test_c = (1.5625*10**5 - 0.02*test_b - 0.02*test_a)
+    test_a = 1 * 10**6
+    test_b = 1 * 10**6
+    test_c = (1.5625 * 10**5 - 0.02 * test_b - 0.02 * test_a)
     ## Fan velocity for test
     fan_velocity = 10.0
-    heq.set_heat_generation(heat_generation_function,test_a,test_b,test_c)
+    heq.set_heat_generation(heat_generation_function, test_a, test_b, test_c)
     heq.set_fan_velocity(fan_velocity)
     ## plotting initial conditions
     fig, ax = plt.subplots()
-    contour1 = ax.contourf(heq.X,heq.Y,heq.u - 273)
-    fig.colorbar(contour1,ax=ax)
+    contour1 = ax.contourf(heq.X, heq.Y, heq.u - 273)
+    fig.colorbar(contour1, ax=ax)
     plt.show()
     ## Setting objective function
     heq.max_iter = 5E5
-    w1 = 0.5
+    #w1 = 0.5
+    w1 = 0.2
     w2 = 1 - w1
     global_tolerance = 1E-3
 
+    #cache so the callback can reuse results
+    cache = {"x": None, "Tmax": None, "eta": None, "con": None, "obj": None}
 
     def objective_function(x):
         """Objective Function
@@ -399,7 +405,7 @@ if __name__ == "__main__":
 
         """
         # Extract values
-        v,a,b,c = x 
+        v, a, b, c = x
         heq.reset()
 
         # Set variables
@@ -412,13 +418,16 @@ if __name__ == "__main__":
         # Store the results
         Tmax = np.max(heq.u)
         eta = heq.fan_efficiency
-        obj = w1 * (Tmax / 273.0) - w2 * eta
+        obj = w1 * (Tmax / 273.0) - w2 * eta #normalizing for conditioning
+        con = heq.heat_generation_total - 10.0
 
-        history["obj"].append(obj)
-        history["Tmax"].append(Tmax)
-        history["eta"].append(eta)
-        history["constraint"].append(heq.heat_generation_total - 10.0)
-        history["x"].append(x.copy())
+        #cache instead of history
+        cache["obj"] = obj
+        cache["Tmax"] = Tmax
+        cache["eta"] = eta
+        cache["con"] = con
+        cache["x"] = np.array(x, dtype=float).copy()
+
         return obj
 
     ## Bounds for inputs
@@ -441,28 +450,56 @@ if __name__ == "__main__":
         x[3] (float): c coefficient of heat generation
         """
 
-        _,a,b,c = x # Extract Variables
+        _, a, b, c = x  # Extract Variables
 
         #Calculate heat generation
         heq.set_heat_generation(heat_generation_function, a, b, c)
- 
-        return heq.heat_generation_total - 10
 
-    ## Setting the constraints
-    constraints = [
-        {'type': 'eq', 'fun': constraint_one},
-    ]
+        return heq.heat_generation_total - 10.0
+
+    ## Setting the constraints as a nonlinear constrant list (needed for trust-constr)
+    nlc = optimize.NonlinearConstraint(constraint_one, 0.0, 0.0, jac="2-point")
+
     ## Creating the initial guess
     v0 = 10
     x0_heat = 0
-    x0 = [v0, x0_heat * 10 ** 5, x0_heat * 10 ** 5, (156250 - 0.02 * x0_heat * 10 ** 5 - 0.02 * x0_heat * 10 ** 5)]
+    x0 = [v0,
+          x0_heat * 10 ** 5,
+          x0_heat * 10 ** 5,
+          (156250 - 0.02 * x0_heat * 10 ** 5 - 0.02 * x0_heat * 10 ** 5)]
     heq.verbose = False
-    ## Optimize
+
+    #adding callback to store iteration history and compute lagrangian (for plots)
+    def callback(xk, state):
+        xk = np.array(xk, dtype=float)
+        if cache["x"] is None or not np.allclose(xk, cache["x"], rtol=0, atol=0):
+            objective_function(xk)
+
+        g = np.asarray(state.grad, dtype=float)
+        Jc = np.asarray(state.jac[0], dtype=float)
+        lam = np.asarray(state.v[0], dtype=float).ravel()
+
+        grad_L = g + Jc.T @ lam
+        grad_L_norm = np.linalg.norm(grad_L)
+
+        #append
+        history["obj"].append(state.fun)
+        history["Tmax"].append(cache["Tmax"])
+        history["eta"].append(cache["eta"])
+        history["constraint"].append(cache["con"])
+        history["x"].append(xk.copy())
+        history["grad_L"].append(grad_L_norm)
+
+    ## Optimize (using trust-constr)
     optimization_result = optimize.minimize(
         objective_function,
         x0,
+        method="trust-constr",
+        jac="2-point", #2-point computes jacboian using finite differences (forward difference)
         bounds=bounds,
-        constraints=constraints
+        constraints=[nlc],
+        callback=callback,
+        options={"maxiter": 30}
     )
     ## Build optimal solution
     heq.set_fan_velocity(optimization_result.x[0])
@@ -478,6 +515,78 @@ if __name__ == "__main__":
         f"Constraints:\n"
         f"Total Heat Generation: {heq.heat_generation_total} Constraint: {constraint_one(optimization_result.x)}\n"
     )
+
+    #plots for part b
+    it = np.arange(1, len(history["obj"]) + 1)
+    x_hist = np.array(history["x"])
+
+    #Lagrangian gradient
+    plt.figure()
+    plt.plot(it, history["grad_L"])
+    plt.xlabel("Iteration")
+    plt.ylabel(r"$\|\nabla \mathcal{L}\|_2$")
+    plt.title("Lagrangian Gradient Norm Convergence")
+    plt.grid(True)
+
+    #objective function convergence
+    plt.figure()
+    plt.plot(it, history["obj"])
+    plt.xlabel("Iteration")
+    plt.ylabel("Objective")
+    plt.title("Objective Convergence")
+    plt.grid(True)
+
+    #maximum temperature convergence
+    plt.figure()
+    plt.plot(it, history["Tmax"])
+    plt.xlabel("Iteration")
+    plt.ylabel(r"$T_{\max}$ (K)")
+    plt.title("Maximum Temperature Convergence")
+    plt.grid(True)
+
+    #efficiency convergence
+    plt.figure()
+    plt.plot(it, history["eta"])
+    plt.xlabel("Iteration")
+    plt.ylabel(r"$\eta$")
+    plt.title("Fan Efficiency Convergence")
+    plt.grid(True)
+
+    #constraint convergence (heat=10W)
+    plt.figure()
+    plt.plot(it, history["constraint"])
+    plt.xlabel("Iteration")
+    plt.ylabel("Power Constraint Residual (W)")
+    plt.title("Constraint Convergence")
+    plt.grid(True)
+
+    #fan velocity convergence
+    plt.figure()
+    plt.plot(it, x_hist[:, 0])
+    plt.xlabel("Iteration")
+    plt.ylabel(r"$v$ (m/s)")
+    plt.title("Fan Velocity Convergence")
+    plt.grid(True)
+
+    #plot for design parameters a and b
+    plt.figure()
+    plt.plot(it, x_hist[:, 1], label="a")
+    plt.plot(it, x_hist[:, 2], label="b")
+    plt.xlabel("Iteration")
+    plt.ylabel("Heat generation slope parameters")
+    plt.title("Design Parameter Convergence: a and b")
+    plt.legend()
+    plt.grid(True)
+
+    #plot for design parameter c
+    plt.figure()
+    plt.plot(it, x_hist[:, 3])
+    plt.xlabel("Iteration")
+    plt.ylabel("c")
+    plt.title("Design Parameter Convergence: c")
+    plt.grid(True) 
+    plt.show()
+
     ## Plot optimal solution
     fig, ax = plt.subplots()
     contour3 = ax.contourf(heq.X, heq.Y, heq.u - 273)
