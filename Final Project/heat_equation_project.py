@@ -3,7 +3,10 @@ import numpy as np  # numpy for vectorization
 from collections.abc import Callable  # For type hints
 import matplotlib.pyplot as plt
 from scipy import optimize
-
+import jax
+import jax.numpy as jnp
+from jax import config
+config.update("jax_enable_x64", True)
 class HeatEquation2D:
     """Heat Equation Solver for MECH 579 Final Project
 
@@ -163,7 +166,8 @@ class HeatEquation2D:
         u (np.ndarray): Current Temperature Mesh
         """
         beta = 1 / ((u + self.ext_T) / 2)
-        rayleigh = 9.81 * beta * (u - self.ext_T) * self.dx**3 / (self.ext_nu**2) * self.ext_Pr
+        #added absolute value so its never negative 
+        rayleigh = 9.81 * beta * np.abs(u - self.ext_T) * self.dx**3 / (self.ext_nu**2) * self.ext_Pr
         nusselt = (0.825 + (0.387 * rayleigh**(1/6)) /
                    (1 + (0.492 / self.ext_Pr)**(9/16))**(8/27))**2
         return nusselt * self.ext_k / self.dx
@@ -429,7 +433,201 @@ if __name__ == "__main__":
         cache["x"] = np.array(x, dtype=float).copy()
 
         return obj
+    
+    #jax AD gradient for objective function
+    Xj = jnp.asarray(heq.X, dtype=jnp.float64)
+    Yj = jnp.asarray(heq.Y, dtype=jnp.float64)
+    dx = float(heq.dx)
+    dy = float(heq.dy)
+    dt = float(heq.dt)
+    alp = float(heq.thermal_alpha)
 
+    #constant 
+    k_air = float(heq.ext_k)
+    Pr = float(heq.ext_Pr)
+    nu = float(heq.ext_nu)
+    Tinf = float(heq.ext_T)
+    g0 = 9.81
+
+    k_s = float(heq.k)
+    H = float(heq.height)
+
+    n = int(heq.n_x)  # assume a square grid
+    tau = alp * dt / (dx * dy)
+
+    #functions (same as before but using jax.numpy)
+    def u0_jax():
+        return 70.0 * jnp.sin(Xj * jnp.pi / cpu_x) * jnp.sin(Yj * jnp.pi / cpu_y) + 293.0
+    def eta_jax(v):
+        return -0.002*v*v+0.08*v
+    def q_jax(a, b, c):
+        return a * Xj + b * Yj + c
+    #adding small term so i dont get nan in output 
+    EPS=1e-12
+    def h_top_jax(v):
+        Rex = v * Xj / nu
+        Rex=jnp.maximum(Rex,0.0)+EPS
+        Nu_lam = 0.332 * (Rex**0.5) * (Pr ** (1.0 / 3.0))
+        Nu_tur = 0.0296 * (Rex ** 0.8) * (Pr ** (1.0 / 3.0))
+        Nu = jnp.where(Rex < 5e5, Nu_lam, Nu_tur)
+        return Nu * k_air / (Xj + 1e-5)
+
+    def h_side_jax(u):
+        denom = (u + Tinf) / 2.0
+        denom = jnp.where(jnp.abs(denom) < EPS, jnp.sign(denom) * EPS, denom)
+        beta= 1.0/denom
+        Ra = g0 * beta * jnp.abs(u - Tinf) * (dx ** 3) / (nu ** 2) * Pr
+        Ra=jnp.maximum(Ra,0.0)+EPS
+
+        Nu = (0.825 + (0.387 * (Ra ** (1.0 / 6.0))) /
+              ((1.0 + (0.492 / Pr) ** (9.0 / 16.0)) ** (8.0 / 27.0))) ** 2
+        return Nu * k_air / dx
+
+    def step_jax(u, v, a, b, c):
+        ht = h_top_jax(v)
+        hb = h_side_jax(u)
+        e = q_jax(a, b, c)
+
+        u0 = u
+        un = u0
+
+        i0, iN, j0, jN = 0, n - 1, 0, n - 1
+
+        # Left edge
+        un = un.at[i0, 1:-1].set(
+            u0[i0, 1:-1]
+            + 2 * tau * hb[i0, 1:-1] / k_s * dy * (Tinf - u0[i0, 1:-1])
+            + tau * dx * (u0[i0, 2:] - u0[i0, 1:-1]) / dy
+            + tau * dx * (u0[i0, 1:-1] - u0[i0, 2:]) / dy
+            + 2 * tau * dy * (u0[i0 + 1, 1:-1] - u0[i0, 1:-1]) / dx
+            + tau * ht[i0, 1:-1] / k_s * dx * dy / H * (Tinf - u0[i0, 1:-1])
+            + tau * e[i0, 1:-1] / k_s * dx * dy
+        )
+
+        # Right edge
+        un = un.at[iN, 1:-1].set(
+            u0[iN, 1:-1]
+            + 2 * tau * hb[iN, 1:-1] / k_s * dy * (Tinf - u0[iN, 1:-1])
+            + tau * dx * (u0[iN, 2:] - u0[iN, 1:-1]) / dy
+            + tau * dx * (u0[iN, 1:-1] - u0[iN, 2:]) / dy
+            + 2 * tau * dy * (u0[iN - 1, 1:-1] - u0[iN, 1:-1]) / dx
+            + tau * ht[iN, 1:-1] / k_s * dx * dy / H * (Tinf - u0[iN, 1:-1])
+            + tau * e[iN, 1:-1] / k_s * dx * dy
+        )
+
+        # Bottom edge
+        un = un.at[1:-1, j0].set(
+            u0[1:-1, j0]
+            + 2 * tau * hb[1:-1, j0] / k_s * dx * (Tinf - u0[1:-1, j0])
+            + tau * dy * (u0[2:, j0] - u0[1:-1, j0]) / dx
+            + tau * dy * (u0[1:-1, j0] - u0[2:, j0]) / dx
+            + 2 * tau * dx * (u0[1:-1, j0 + 1] - u0[1:-1, j0]) / dy
+            + tau * ht[1:-1, j0] / k_s * dx * dy / H * (Tinf - u0[1:-1, j0])
+            + tau * e[1:-1, j0] / k_s * dx * dy
+        )
+
+        # Top edge
+        un = un.at[1:-1, jN].set(
+            u0[1:-1, jN]
+            + 2 * tau * hb[1:-1, jN] / k_s * dx * (Tinf - u0[1:-1, jN])
+            + tau * dy * (u0[2:, jN] - u0[1:-1, jN]) / dx
+            + tau * dy * (u0[1:-1, jN] - u0[2:, jN]) / dx
+            + 2 * tau * dx * (u0[1:-1, jN - 1] - u0[1:-1, jN]) / dy
+            + tau * ht[1:-1, jN] / k_s * dx * dy / H * (Tinf - u0[1:-1, jN])
+            + tau * e[1:-1, jN] / k_s * dx * dy
+        )
+
+        # Corners
+        un = un.at[i0, j0].set(
+            u0[i0, j0]
+            + 2 * tau * hb[i0, j0] * dy / k_s * (Tinf - u0[i0, j0])
+            + 2 * tau * hb[i0, j0] * dx / k_s * (Tinf - u0[i0, j0])
+            + 2 * tau * dx * (u0[i0, j0 + 1] - u0[i0, j0]) / dy
+            + 2 * tau * dy * (u0[i0 + 1, j0] - u0[i0, j0]) / dx
+            + tau * ht[i0, j0] / k_s * dx * dy / H * (Tinf - u0[i0, j0])
+            + tau * e[i0, j0] / k_s * dx * dy
+        )
+
+        un = un.at[iN, j0].set(
+            u0[iN, j0]
+            + 2 * tau * hb[iN, j0] * dy / k_s * (Tinf - u0[iN, j0])
+            + 2 * tau * hb[iN, j0] * dx / k_s * (Tinf - u0[iN, j0])
+            + 2 * tau * dx * (u0[iN, j0 + 1] - u0[iN, j0]) / dy
+            + 2 * tau * dy * (u0[iN - 1, j0] - u0[iN, j0]) / dx
+            + tau * ht[iN, j0] / k_s * dx * dy / H * (Tinf - u0[iN, j0])
+            + tau * e[iN, j0] / k_s * dx * dy
+        )
+
+        un = un.at[i0, jN].set(
+            u0[i0, jN]
+            + 2 * tau * hb[i0, jN] * dy / k_s * (Tinf - u0[i0, jN])
+            + 2 * tau * hb[i0, jN] * dx / k_s * (Tinf - u0[i0, jN])
+            + 2 * tau * dx * (u0[i0, jN - 1] - u0[i0, jN]) / dy
+            + 2 * tau * dy * (u0[i0 + 1, jN] - u0[i0, jN]) / dx
+            + tau * ht[i0, jN] / k_s * dx * dy / H * (Tinf - u0[i0, jN])
+            + tau * e[i0, jN] / k_s * dx * dy
+        )
+
+        un = un.at[iN, jN].set(
+            u0[iN, jN]
+            + 2 * tau * hb[iN, jN] * dy / k_s * (Tinf - u0[iN, jN])
+            + 2 * tau * hb[iN, jN] * dx / k_s * (Tinf - u0[iN, jN])
+            + 2 * tau * dx * (u0[iN, jN - 1] - u0[iN, jN]) / dy
+            + 2 * tau * dy * (u0[iN - 1, jN] - u0[iN, jN]) / dx
+            + tau * ht[iN, jN] / k_s * dx * dy / H * (Tinf - u0[iN, jN])
+            + tau * e[iN, jN] / k_s * dx * dy
+        )
+
+        # Interior
+        un = un.at[1:-1, 1:-1].set(
+            u0[1:-1, 1:-1]
+            + tau * (
+                dy * (u0[2:, 1:-1] - 2 * u0[1:-1, 1:-1] + u0[0:-2, 1:-1]) / dx
+                + dx * (u0[1:-1, 2:] - 2 * u0[1:-1, 1:-1] + u0[1:-1, 0:-2]) / dy
+            )
+            + tau * (
+                ht[1:-1, 1:-1] / k_s * dx * dy / H * (Tinf - u0[1:-1, 1:-1])
+                + dx * dy / k_s * e[1:-1, 1:-1]
+            )
+        )
+
+        err = jnp.max(jnp.abs(un - u0))
+        return un, err
+    
+    def obj_jax(x):
+        v, a, b, c = x
+        u = u0_jax()
+        err0 = jnp.array(1e9)
+        it0 = jnp.array(0)
+
+        nsteps = 3000  # small for testing, increase after
+
+        def cond(state):
+            _, _, it = state
+            return it < nsteps  # Only depend on iteration count: differentiable
+
+        def body(state):
+            u, err, it = state
+            un, ern = step_jax(u, v, a, b, c)
+            return (un, ern, it + 1)
+
+        u, _, _ = jax.lax.while_loop(cond, body, (u, err0, it0))
+
+        Tmax = jnp.max(u)
+        return w1 * (Tmax / 273.0) - w2 * eta_jax(v)
+    
+    #using forward mode (AD) instead of classic jac.grad() because its taking too long to run
+    #jax.jacfwd returns jacobian isntead of a scalar
+    grad_obj_jax = jax.grad(obj_jax) 
+
+    #central difference for derivative comparison
+    def fd_central(fun, x, i, h):
+        xp = x.copy()
+        xm = x.copy()
+        xp[i] += h
+        xm[i] -= h
+        return (fun(xp) - fun(xm)) / (2.0 * h)
+    
     ## Bounds for inputs
     bounds = [
         (0, 30),
@@ -442,7 +640,7 @@ if __name__ == "__main__":
         """Constraint for total power generation by the CPU
 
         Parameters
-#put in constraints
+        #put in constraints
         -------
 
         x[1] (float): a coefficient of heat generation
@@ -490,18 +688,18 @@ if __name__ == "__main__":
         history["x"].append(xk.copy())
         history["grad_L"].append(grad_L_norm)
 
-    ## Optimize (using trust-constr)
+    # Optimize (using trust-constr)
     optimization_result = optimize.minimize(
         objective_function,
         x0,
-        method="trust-constr",
+        method="trust-constr", #takes a long time to run 
         jac="2-point", #2-point computes jacboian using finite differences (forward difference)
         bounds=bounds,
         constraints=[nlc],
         callback=callback,
         options={"maxiter": 30}
     )
-    ## Build optimal solution
+    # Build optimal solution
     heq.set_fan_velocity(optimization_result.x[0])
     heq.set_heat_generation(heat_generation_function, optimization_result.x[1], optimization_result.x[2],
                             optimization_result.x[3])
@@ -515,8 +713,37 @@ if __name__ == "__main__":
         f"Constraints:\n"
         f"Total Heat Generation: {heq.heat_generation_total} Constraint: {constraint_one(optimization_result.x)}\n"
     )
+    #table for comparing FD vs AD
+    x_eval = np.array(optimization_result.x, dtype=float)
 
-    #plots for part b
+    idx = 0  #in this case, comparing v. 0=v, 1=a, 2=b, 3=c
+    name = ["v", "a", "b", "c"][idx]
+
+    hs = [1e-1, 5e-2, 1e-2, 5e-3, 1e-3, 5e-4, 1e-4]
+    fd_vals = [fd_central(objective_function, x_eval, idx, h) for h in hs]
+
+    fd_ref = fd_vals[-1]
+    for k_ in range(2, len(fd_vals)):
+        if abs(fd_vals[-k_] - fd_vals[-k_ + 1]) < 1e-10 * max(1.0, abs(fd_vals[-k_ + 1])):
+            fd_ref = fd_vals[-k_]
+            break
+
+    ad_val = float(grad_obj_jax(jnp.array(x_eval, dtype=jnp.float64))[idx])
+    #finite difference convergence "sweep"
+    print("\nFD convergence for dJ/d%s:" % name)
+    for h, vfd in zip(hs, fd_vals):
+        print(f"h = {h:.1e}  FD = {vfd:.16e}")
+
+    #table comparison for AD vs FD
+    print("\nDerivative comparison (all digits shown):")
+    print(f"{'parameter':>6}  {'FD (converged)':>22}  {'AD (JAX)':>22}  {'absolute difference':>22}")
+    print(f"{name:>6}  {fd_ref:>22.16e}  {ad_val:>22.16e}  {abs(fd_ref-ad_val):>22.16e}")
+
+    g_ad = np.array(grad_obj_jax(jnp.array(x_eval, dtype=jnp.float64)), dtype=float)
+    print("\nFull AD gradient at x_eval [dJ/dv, dJ/da, dJ/db, dJ/dc]:")
+    print(g_ad)
+
+    '''#plots for part b
     it = np.arange(1, len(history["obj"]) + 1)
     x_hist = np.array(history["x"])
 
@@ -591,4 +818,4 @@ if __name__ == "__main__":
     fig, ax = plt.subplots()
     contour3 = ax.contourf(heq.X, heq.Y, heq.u - 273)
     fig.colorbar(contour3, ax=ax)
-    plt.show()
+    plt.show()'''
